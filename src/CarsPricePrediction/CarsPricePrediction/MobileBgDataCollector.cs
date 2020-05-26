@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Text.Json;
 using System.IO;
+using System.Linq;
 
 namespace CarsPricePrediction
 {
@@ -13,7 +14,26 @@ namespace CarsPricePrediction
         {
             var advertisementmodels = new List<CarAdvertisementModel>();
 
+            var brandsModelsContainer = GetBrandsModelsContainer();
+
             return advertisementmodels;
+        }
+
+        private static BrandsModelsContainer GetBrandsModelsContainer()
+        {
+            var brandsModelsContainer = new BrandsModelsContainer();
+
+            var lines = File.ReadAllLines("BrandsModels.txt");
+            lines = lines.Select(line => line.Substring(1, line.Length - 2)).ToArray();
+            var linesSplit = lines.Select(line => line.Split(",")).ToArray();
+
+            for (int i = 0; i < linesSplit.Count(); i++)
+            {
+                linesSplit[i] = linesSplit[i].Select(str => str.Substring(1, str.Length - 2)).ToArray();
+                brandsModelsContainer.BrandsModels.Add(linesSplit[i][0], linesSplit[i].Skip(2).ToList());
+            }
+
+            return brandsModelsContainer;
         }
     }
 

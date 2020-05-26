@@ -6,6 +6,11 @@ namespace CarsPricePrediction
 {
     public class BrandsModelsContainer
     {
-        public string[][] BrandsModels;
+        public Dictionary<string, List<string>> BrandsModels;
+
+        public BrandsModelsContainer()
+        {
+            this.BrandsModels = new Dictionary<string, List<string>>();
+        }
     }
 }
