@@ -9,7 +9,7 @@ namespace CarsPricePrediction
         static async Task Main(string[] args)
         {
             MobileBgDataCollector mobileBgDataCollector = new MobileBgDataCollector();
-            await mobileBgDataCollector.CollectData(0, 0);
+            await mobileBgDataCollector.CollectData();
         }
     }
 }
