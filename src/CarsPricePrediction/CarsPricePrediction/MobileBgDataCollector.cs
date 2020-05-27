@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using System.Text.Json;
 using System.IO;
 using System.Linq;
 using AngleSharp.Html.Parser;
@@ -28,8 +27,9 @@ namespace CarsPricePrediction
             {
                 foreach (var model in brand.Value)
                 {
+                    
                     var formData =
-                    $"topmenu=1&rub=1&act=3&rub_pub_save=1&f0=127.0.0.1&f1=1&f2=1";
+                    $"rub=1&act=3&f5=BMW&f6=114";
                     var response = await client.PostAsync(
                                        SearchAddressPost,
                                        new StringContent(formData, Encoding.UTF8, "application/x-www-form-urlencoded"));
