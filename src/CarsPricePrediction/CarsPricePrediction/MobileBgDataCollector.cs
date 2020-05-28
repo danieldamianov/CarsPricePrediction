@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using AngleSharp.Html.Parser;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 
 namespace CarsPricePrediction
 {
@@ -21,6 +22,9 @@ namespace CarsPricePrediction
             var handler = new HttpClientHandler { AllowAutoRedirect = false, };
             var client = new HttpClient(handler);
 
+            const string pagesCountRegex = @"<b>Страница 1 от (?<pagesCount>\d{1,2})<\/b>";
+            var pagesCountRegexObject = new System.Text.RegularExpressions.Regex(pagesCountRegex);
+
             var brandsModelsContainer = GetBrandsModelsContainer();
 
             foreach (var brand in brandsModelsContainer.BrandsModels)
@@ -29,12 +33,53 @@ namespace CarsPricePrediction
                 {
                     
                     var formData =
-                    $"rub=1&act=3&f5=BMW&f6=114";
+                    $"rub=1&act=3&f5={brand.Key}&f6={model}";
                     var response = await client.PostAsync(
                                        SearchAddressPost,
                                        new StringContent(formData, Encoding.UTF8, "application/x-www-form-urlencoded"));
 
                     var location = response.Headers.Location;
+
+                    var carsFirstPage = await client.GetAsync(location);
+
+                    var byteContent = await carsFirstPage.Content.ReadAsByteArrayAsync();
+                    var html = Encoding.GetEncoding("windows-1251").GetString(byteContent);
+
+                    var parssedHtml = await parser.ParseDocumentAsync(html);
+
+                    var pagesElement = parssedHtml.GetElementsByClassName("pageNumbersInfo");
+                    var innerText = pagesElement.First().InnerHtml;
+                    pagesCountRegexObject.Match(innerText).Groups.TryGetValue("pagesCount",out Group group);
+                    var totalPagesCount = int.Parse(group.Value);
+
+                    for (int pageNumber = 1; pageNumber <= totalPagesCount; pageNumber++)
+                    {
+                        var pageLocation = @"https://www.mobile.bg" + location.PathAndQuery.Substring(0, location.PathAndQuery.Length - 1) + pageNumber;
+                        var pageResponse = await client.GetAsync(pageLocation);
+
+                        var byteContentPageResponse = await pageResponse.Content.ReadAsByteArrayAsync();
+                        var htmlPageResponse = Encoding.GetEncoding("windows-1251").GetString(byteContent);
+
+                        var parssedHtmlPageResponse = await parser.ParseDocumentAsync(htmlPageResponse);
+
+                        var advertisements = parssedHtmlPageResponse.GetElementsByClassName("photoLink").Where(
+                        x => x.Attributes["href"]?.Value?.Contains(@"//www.mobile.bg/pcgi/mobile.cgi?act=4&adv=") == true).ToList();
+
+                        foreach (var advertisement in advertisements)
+                        {
+                            var url = "https:" + advertisement.Attributes["href"].Value;
+                            var advertisementResponse = await client.GetAsync(url);
+
+                            var byteContentAdvertisemen = await advertisementResponse.Content.ReadAsByteArrayAsync();
+                            var htmlAdvertisement = Encoding.GetEncoding("windows-1251").GetString(byteContentAdvertisemen);
+
+                            var advertisementPageParsed = await parser.ParseDocumentAsync(htmlAdvertisement);
+
+                            var dillarDataElement = advertisementPageParsed.GetElementsByClassName("dilarData").First();
+                            var listItemsInTheDillarData = dillarDataElement.GetElementsByTagName("li");
+                            ;
+                        }
+                    }
 
                     Console.WriteLine($"Collection information about : {brand.Key} , {model}");
                 }
