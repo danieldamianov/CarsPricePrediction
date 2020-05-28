@@ -7,9 +7,25 @@ using System.Linq;
 using AngleSharp.Html.Parser;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Net;
+using AngleSharp.Dom;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CarsPricePrediction
 {
+    public class AttribureComparer : IEqualityComparer<IAttr>
+    {
+        public bool Equals([AllowNull] IAttr x, [AllowNull] IAttr y)
+        {
+            return x.LocalName == y.LocalName;
+        }
+
+        public int GetHashCode([DisallowNull] IAttr obj)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public class MobileBgDataCollector
     {
         public async Task<IEnumerable<CarAdvertisementModel>> CollectData()
@@ -31,7 +47,7 @@ namespace CarsPricePrediction
             {
                 foreach (var model in brand.Value)
                 {
-                    
+
                     var formData =
                     $"rub=1&act=3&f5={brand.Key}&f6={model}";
                     var response = await client.PostAsync(
@@ -49,7 +65,7 @@ namespace CarsPricePrediction
 
                     var pagesElement = parssedHtml.GetElementsByClassName("pageNumbersInfo");
                     var innerText = pagesElement.First().InnerHtml;
-                    pagesCountRegexObject.Match(innerText).Groups.TryGetValue("pagesCount",out Group group);
+                    pagesCountRegexObject.Match(innerText).Groups.TryGetValue("pagesCount", out Group group);
                     var totalPagesCount = int.Parse(group.Value);
 
                     for (int pageNumber = 1; pageNumber <= totalPagesCount; pageNumber++)
@@ -58,7 +74,7 @@ namespace CarsPricePrediction
                         var pageResponse = await client.GetAsync(pageLocation);
 
                         var byteContentPageResponse = await pageResponse.Content.ReadAsByteArrayAsync();
-                        var htmlPageResponse = Encoding.GetEncoding("windows-1251").GetString(byteContent);
+                        var htmlPageResponse = Encoding.GetEncoding("windows-1251").GetString(byteContentPageResponse);
 
                         var parssedHtmlPageResponse = await parser.ParseDocumentAsync(htmlPageResponse);
 
@@ -77,7 +93,35 @@ namespace CarsPricePrediction
 
                             var dillarDataElement = advertisementPageParsed.GetElementsByClassName("dilarData").First();
                             var listItemsInTheDillarData = dillarDataElement.GetElementsByTagName("li");
-                            ;
+
+                            IHtmlCollection<IElement> tables = advertisementPageParsed.GetElementsByTagName("table");
+
+                            var tableInfo = tables
+                                .FirstOrDefault(el => el.InnerHtml.Contains("</table>") == false && (el.InnerHtml.Contains(@"<label class=""extra_cat"">Безопасност</label>")
+                                || el.InnerHtml.Contains(@"<label class=""extra_cat"">Комфорт</label>")
+                                || el.InnerHtml.Contains(@"<label class=""extra_cat"">Други</label>")
+                                || el.InnerHtml.Contains(@"<label class=""extra_cat"">Защита</label>")
+                                || el.InnerHtml.Contains(@"<label class=""extra_cat"">Интериор</label>")
+                                || el.InnerHtml.Contains(@"<label class=""extra_cat"">Екстериор</label>")
+                                || el.InnerHtml.Contains(@"<label class=""extra_cat"">Специализирани</label>")));
+
+                            if (tableInfo == null)
+                            {
+                                continue;
+                            }
+
+                            Dictionary<string, string> mainProperties = new Dictionary<string, string>();
+
+                            //File.AppendAllText("data.csv", $"{brand.Key},");
+                            //File.AppendAllText("data.csv", $"{model},");
+
+                            for (int i = 0; i < listItemsInTheDillarData.Length; i += 2)
+                            {
+                                mainProperties.Add(listItemsInTheDillarData[i].InnerHtml, listItemsInTheDillarData[i + 1].InnerHtml);
+                                //File.AppendAllText("data.csv", $"{listItemsInTheDillarData[i].InnerHtml},",Encoding.GetEncoding(1251));
+                            }
+
+                            //File.AppendAllText("data.csv", Environment.NewLine);
                         }
                     }
 
