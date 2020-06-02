@@ -30,6 +30,18 @@ namespace CarsPricePrediction
     {
         public async Task<IEnumerable<CarAdvertisementModel>> CollectData()
         {
+            int skippedBecauseLackAdditionalInfo = 0;
+            int skippedBecauseMainInfo = 0;
+            File.AppendAllText("data.csv", "Brand,");
+            File.AppendAllText("data.csv", "Model,");
+            File.AppendAllText("data.csv", "Category,");
+            File.AppendAllText("data.csv", "ManufacturingDate,");
+            File.AppendAllText("data.csv", "EngineType,");
+            File.AppendAllText("data.csv", "Power,");
+            File.AppendAllText("data.csv", "Shifter,");
+            File.AppendAllText("data.csv", "DistanceTravelled,");
+            File.AppendAllText("data.csv", Environment.NewLine);
+
             const string SearchAddressPost = "https://www.mobile.bg/pcgi/mobile.cgi";
 
             var advertisementmodels = new List<CarAdvertisementModel>();
@@ -107,13 +119,12 @@ namespace CarsPricePrediction
 
                             if (tableInfo == null)
                             {
+                                skippedBecauseLackAdditionalInfo++;
                                 continue;
                             }
 
                             Dictionary<string, string> mainProperties = new Dictionary<string, string>();
 
-                            //File.AppendAllText("data.csv", $"{brand.Key},");
-                            //File.AppendAllText("data.csv", $"{model},");
 
                             for (int i = 0; i < listItemsInTheDillarData.Length; i += 2)
                             {
@@ -121,15 +132,42 @@ namespace CarsPricePrediction
                                 //File.AppendAllText("data.csv", $"{listItemsInTheDillarData[i].InnerHtml},",Encoding.GetEncoding(1251));
                             }
 
-                            //File.AppendAllText("data.csv", Environment.NewLine);
+                            if ((!mainProperties.ContainsKey("Дата на производство"))
+                                || (!mainProperties.ContainsKey("Тип двигател"))
+                                || (!mainProperties.ContainsKey("Мощност"))
+                                || (!mainProperties.ContainsKey("Скоростна кутия"))
+                                || (!mainProperties.ContainsKey("Категория"))
+                                || (!mainProperties.ContainsKey("Пробег"))
+                                )
+                            {
+                                skippedBecauseLackAdditionalInfo++;
+                                continue;
+                            }
+
+                            File.AppendAllText("data.csv", $"{brand.Key},".Trim());
+                            File.AppendAllText("data.csv", $"{model},".Trim());
+                            File.AppendAllText("data.csv", $"{mainProperties["Категория"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Дата на производство"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Тип двигател"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Мощност"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Скоростна кутия"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Пробег"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", Environment.NewLine);
                         }
                     }
 
                     Console.WriteLine($"Collection information about : {brand.Key} , {model}");
+                    if (brand.Key == "Alfa Romeo" && model == "146")
+                    {
+                        Console.WriteLine(nameof(skippedBecauseLackAdditionalInfo) + " " + skippedBecauseLackAdditionalInfo);
+                        Console.WriteLine(nameof(skippedBecauseMainInfo) + " " + skippedBecauseMainInfo);
+                        break;
+                    }
                 }
             }
 
-
+            Console.WriteLine(nameof(skippedBecauseLackAdditionalInfo) + " " + skippedBecauseLackAdditionalInfo);
+            Console.WriteLine(nameof(skippedBecauseMainInfo) + " " + skippedBecauseMainInfo);
             return advertisementmodels;
         }
 
