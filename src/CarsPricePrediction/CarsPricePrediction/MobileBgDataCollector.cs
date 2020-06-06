@@ -1,38 +1,48 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
-using System.IO;
-using System.Linq;
-using AngleSharp.Html.Parser;
-using System.Net.Http;
-using System.Text.RegularExpressions;
-using System.Net;
-using AngleSharp.Dom;
-using System.Diagnostics.CodeAnalysis;
-
-namespace CarsPricePrediction
+﻿namespace CarsPricePrediction
 {
-    public class AttribureComparer : IEqualityComparer<IAttr>
-    {
-        public bool Equals([AllowNull] IAttr x, [AllowNull] IAttr y)
-        {
-            return x.LocalName == y.LocalName;
-        }
-
-        public int GetHashCode([DisallowNull] IAttr obj)
-        {
-            throw new NotImplementedException();
-        }
-    }
+    using System;
+    using System.Collections.Generic;
+    using System.Text;
+    using System.Threading.Tasks;
+    using System.IO;
+    using System.Linq;
+    using AngleSharp.Html.Parser;
+    using System.Net.Http;
+    using System.Text.RegularExpressions;
+    using AngleSharp.Dom;
+    using AngleSharp.Html.Dom;
 
     public class MobileBgDataCollector
     {
-        public async Task<IEnumerable<CarAdvertisementModel>> CollectData()
+        private readonly HtmlParser parser;
+        private readonly HttpClientHandler handler;
+        private readonly HttpClient client;
+
+        public MobileBgDataCollector()
+        {
+            this.parser = new HtmlParser();
+            this.handler = new HttpClientHandler { AllowAutoRedirect = false, };
+            this.client = new HttpClient(handler);
+        }
+
+        private async Task<IHtmlDocument> GetParsedHtml(HttpResponseMessage httpResponse)
+        {
+            var byteContent = await httpResponse.Content.ReadAsByteArrayAsync();
+            var htmlRaw = Encoding.GetEncoding("windows-1251").GetString(byteContent);
+            var parsedHtml = await parser.ParseDocumentAsync(htmlRaw);
+            return parsedHtml;
+        }
+
+        public async Task CollectData()
         {
             int skippedBecauseLackAdditionalInfo = 0;
             int skippedBecauseMainInfo = 0;
-            File.AppendAllText("data.csv", "Brand,");
+
+            string[] aditionalInfoFeatrures = new string[] { "Въздушни възглавници - Предни", "Бордкомпютър", @"Бързи \ бавни скорости",
+                "Климатик", "Климатроник", "4x4", "7 места", "Газова уредба", "Дълга база", "Къса база", "Метанова уредба", "С регистрация",
+                "2(3) Врати", "4(5) Врати", "Панорамен люк", "Теглич", "Аларма", "Кожен салон", "Десен волан", 
+            };
+            File.WriteAllText("data.csv", "Brand,", Encoding.GetEncoding(1251));
             File.AppendAllText("data.csv", "Model,");
             File.AppendAllText("data.csv", "Category,");
             File.AppendAllText("data.csv", "ManufacturingDate,");
@@ -40,18 +50,16 @@ namespace CarsPricePrediction
             File.AppendAllText("data.csv", "Power,");
             File.AppendAllText("data.csv", "Shifter,");
             File.AppendAllText("data.csv", "DistanceTravelled,");
+            foreach (var featrue in aditionalInfoFeatrures)
+            {
+                File.AppendAllText("data.csv", $"{featrue},", Encoding.GetEncoding(1251));
+            }
+            File.AppendAllText("data.csv", "AdvertisementUrl,");
             File.AppendAllText("data.csv", Environment.NewLine);
 
             const string SearchAddressPost = "https://www.mobile.bg/pcgi/mobile.cgi";
-
-            var advertisementmodels = new List<CarAdvertisementModel>();
-
-            var parser = new HtmlParser();
-            var handler = new HttpClientHandler { AllowAutoRedirect = false, };
-            var client = new HttpClient(handler);
-
             const string pagesCountRegex = @"<b>Страница 1 от (?<pagesCount>\d{1,2})<\/b>";
-            var pagesCountRegexObject = new System.Text.RegularExpressions.Regex(pagesCountRegex);
+            var pagesCountRegexObject = new Regex(pagesCountRegex);
 
             var brandsModelsContainer = GetBrandsModelsContainer();
 
@@ -67,13 +75,9 @@ namespace CarsPricePrediction
                                        new StringContent(formData, Encoding.UTF8, "application/x-www-form-urlencoded"));
 
                     var location = response.Headers.Location;
-
                     var carsFirstPage = await client.GetAsync(location);
 
-                    var byteContent = await carsFirstPage.Content.ReadAsByteArrayAsync();
-                    var html = Encoding.GetEncoding("windows-1251").GetString(byteContent);
-
-                    var parssedHtml = await parser.ParseDocumentAsync(html);
+                    var parssedHtml = await GetParsedHtml(carsFirstPage);
 
                     var pagesElement = parssedHtml.GetElementsByClassName("pageNumbersInfo");
                     var innerText = pagesElement.First().InnerHtml;
@@ -85,10 +89,7 @@ namespace CarsPricePrediction
                         var pageLocation = @"https://www.mobile.bg" + location.PathAndQuery.Substring(0, location.PathAndQuery.Length - 1) + pageNumber;
                         var pageResponse = await client.GetAsync(pageLocation);
 
-                        var byteContentPageResponse = await pageResponse.Content.ReadAsByteArrayAsync();
-                        var htmlPageResponse = Encoding.GetEncoding("windows-1251").GetString(byteContentPageResponse);
-
-                        var parssedHtmlPageResponse = await parser.ParseDocumentAsync(htmlPageResponse);
+                        var parssedHtmlPageResponse = await this.GetParsedHtml(pageResponse);
 
                         var advertisements = parssedHtmlPageResponse.GetElementsByClassName("photoLink").Where(
                         x => x.Attributes["href"]?.Value?.Contains(@"//www.mobile.bg/pcgi/mobile.cgi?act=4&adv=") == true).ToList();
@@ -98,13 +99,38 @@ namespace CarsPricePrediction
                             var url = "https:" + advertisement.Attributes["href"].Value;
                             var advertisementResponse = await client.GetAsync(url);
 
-                            var byteContentAdvertisemen = await advertisementResponse.Content.ReadAsByteArrayAsync();
-                            var htmlAdvertisement = Encoding.GetEncoding("windows-1251").GetString(byteContentAdvertisemen);
-
-                            var advertisementPageParsed = await parser.ParseDocumentAsync(htmlAdvertisement);
+                            var advertisementPageParsed = await this.GetParsedHtml(advertisementResponse);
 
                             var dillarDataElement = advertisementPageParsed.GetElementsByClassName("dilarData").First();
                             var listItemsInTheDillarData = dillarDataElement.GetElementsByTagName("li");
+
+                            Dictionary<string, string> mainProperties = new Dictionary<string, string>();
+
+                            for (int i = 0; i < listItemsInTheDillarData.Length; i += 2)
+                            {
+                                mainProperties.Add(listItemsInTheDillarData[i].InnerHtml, listItemsInTheDillarData[i + 1].InnerHtml);
+                            }
+
+                            if ((!mainProperties.ContainsKey("Дата на производство"))
+                                || (!mainProperties.ContainsKey("Тип двигател"))
+                                || (!mainProperties.ContainsKey("Мощност"))
+                                || (!mainProperties.ContainsKey("Скоростна кутия"))
+                                || (!mainProperties.ContainsKey("Категория"))
+                                || (!mainProperties.ContainsKey("Пробег"))
+                                )
+                            {
+                                skippedBecauseMainInfo++;
+                                continue;
+                            }
+
+                            File.AppendAllText("data.csv", $"{brand.Key},".Trim());
+                            File.AppendAllText("data.csv", $"{model},".Trim());
+                            File.AppendAllText("data.csv", $"{mainProperties["Категория"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Дата на производство"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Тип двигател"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Мощност"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Скоростна кутия"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{mainProperties["Пробег"]},".Trim(), Encoding.GetEncoding(1251));
 
                             IHtmlCollection<IElement> tables = advertisementPageParsed.GetElementsByTagName("table");
 
@@ -119,39 +145,21 @@ namespace CarsPricePrediction
 
                             if (tableInfo == null)
                             {
+                                for (int i = 0; i < aditionalInfoFeatrures.Length; i++)
+                                {
+                                    File.AppendAllText("data.csv", $"NULL,");
+                                }
                                 skippedBecauseLackAdditionalInfo++;
-                                continue;
                             }
-
-                            Dictionary<string, string> mainProperties = new Dictionary<string, string>();
-
-
-                            for (int i = 0; i < listItemsInTheDillarData.Length; i += 2)
+                            else
                             {
-                                mainProperties.Add(listItemsInTheDillarData[i].InnerHtml, listItemsInTheDillarData[i + 1].InnerHtml);
-                                //File.AppendAllText("data.csv", $"{listItemsInTheDillarData[i].InnerHtml},",Encoding.GetEncoding(1251));
+                                foreach (var featrue in aditionalInfoFeatrures)
+                                {
+                                    File.AppendAllText("data.csv", $"{tableInfo.InnerHtml.Contains(featrue)},", Encoding.GetEncoding(1251));
+                                }
                             }
 
-                            if ((!mainProperties.ContainsKey("Дата на производство"))
-                                || (!mainProperties.ContainsKey("Тип двигател"))
-                                || (!mainProperties.ContainsKey("Мощност"))
-                                || (!mainProperties.ContainsKey("Скоростна кутия"))
-                                || (!mainProperties.ContainsKey("Категория"))
-                                || (!mainProperties.ContainsKey("Пробег"))
-                                )
-                            {
-                                skippedBecauseLackAdditionalInfo++;
-                                continue;
-                            }
-
-                            File.AppendAllText("data.csv", $"{brand.Key},".Trim());
-                            File.AppendAllText("data.csv", $"{model},".Trim());
-                            File.AppendAllText("data.csv", $"{mainProperties["Категория"]},".Trim(), Encoding.GetEncoding(1251));
-                            File.AppendAllText("data.csv", $"{mainProperties["Дата на производство"]},".Trim(), Encoding.GetEncoding(1251));
-                            File.AppendAllText("data.csv", $"{mainProperties["Тип двигател"]},".Trim(), Encoding.GetEncoding(1251));
-                            File.AppendAllText("data.csv", $"{mainProperties["Мощност"]},".Trim(), Encoding.GetEncoding(1251));
-                            File.AppendAllText("data.csv", $"{mainProperties["Скоростна кутия"]},".Trim(), Encoding.GetEncoding(1251));
-                            File.AppendAllText("data.csv", $"{mainProperties["Пробег"]},".Trim(), Encoding.GetEncoding(1251));
+                            File.AppendAllText("data.csv", $"{url},".Trim(), Encoding.GetEncoding(1251));
                             File.AppendAllText("data.csv", Environment.NewLine);
                         }
                     }
@@ -161,14 +169,13 @@ namespace CarsPricePrediction
                     {
                         Console.WriteLine(nameof(skippedBecauseLackAdditionalInfo) + " " + skippedBecauseLackAdditionalInfo);
                         Console.WriteLine(nameof(skippedBecauseMainInfo) + " " + skippedBecauseMainInfo);
-                        break;
+                        return;
                     }
                 }
             }
 
             Console.WriteLine(nameof(skippedBecauseLackAdditionalInfo) + " " + skippedBecauseLackAdditionalInfo);
             Console.WriteLine(nameof(skippedBecauseMainInfo) + " " + skippedBecauseMainInfo);
-            return advertisementmodels;
         }
 
         private static BrandsModelsContainer GetBrandsModelsContainer()
@@ -187,27 +194,5 @@ namespace CarsPricePrediction
 
             return brandsModelsContainer;
         }
-    }
-
-    public class CarAdvertisementModel
-    {
-        public string Brand { get; set; }
-
-        public string Model { get; set; }
-
-        // Джип, Хечбек, Седан ...
-        public int Category { get; set; }
-
-        public int CreatedBeforeInMonths { get; set; }
-
-        public string EngineType { get; set; }
-
-        public string ShifterType { get; set; }
-
-        public int Power { get; set; }
-
-        public int DistanceTravelled { get; set; }
-
-        public int Price { get; set; }
     }
 }
