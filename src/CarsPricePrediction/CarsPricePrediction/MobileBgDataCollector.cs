@@ -70,28 +70,36 @@
         {
             int skippedBecauseLackAdditionalInfo = 0;
             int skippedBecauseMainInfo = 0;
+            int skippedBecauseBadPrice = 0;
 
             string[] aditionalInfoFeatrures = new string[] {
                 "Въздушни възглавници - Предни", "Бордкомпютър", @"Бързи \ бавни скорости",
                 "Климатик", "Климатроник", "4x4", "7 места", "Газова уредба", "Метанова уредба", "С регистрация",
                 "2(3) Врати", "4(5) Врати", "Панорамен люк", "Теглич", "Аларма", "Кожен салон", "Десен волан",
             };
-            File.WriteAllText("data1.csv", "Brand,", Encoding.UTF8);
-            File.AppendAllText("data1.csv", "Model,");
-            File.AppendAllText("data1.csv", "Category,");
-            File.AppendAllText("data1.csv", "ManufacturingDate,");
-            File.AppendAllText("data1.csv", "MonthsSinceManufacturing,");
-            File.AppendAllText("data1.csv", "EngineType,");
-            File.AppendAllText("data1.csv", "Power,");
-            File.AppendAllText("data1.csv", "Shifter,");
-            File.AppendAllText("data1.csv", "DistanceTravelled,");
+            var stringBuilder = new StringBuilder();
+
+            stringBuilder.Append("Brand,");
+            stringBuilder.Append("Model,");
+            stringBuilder.Append("Category,");
+            //stringBuilder.Append("ManufacturingDate,");
+            stringBuilder.Append("MonthsSinceManufacturing,");
+            stringBuilder.Append("EngineType,");
+            stringBuilder.Append("Power,");
+            stringBuilder.Append("Shifter,");
+            stringBuilder.Append("DistanceTravelled,");
+
+
             foreach (var featrue in aditionalInfoFeatrures)
             {
-                File.AppendAllText("data1.csv", $"{featrue},", Encoding.UTF8);
+                stringBuilder.Append($"{featrue},");
             }
-            File.AppendAllText("data1.csv", "Price,");
-            File.AppendAllText("data1.csv", @"""AdvertisementUrl""");
-            File.AppendAllText("data1.csv", "\n");
+            stringBuilder.Append("Price,");
+            //stringBuilder.Append(@"""AdvertisementUrl""");
+            stringBuilder.Append("\n");
+
+            File.WriteAllText("data1.csv", stringBuilder.ToString(), Encoding.UTF8);
+            stringBuilder.Clear();
 
             const string SearchAddressPost = "https://www.mobile.bg/pcgi/mobile.cgi";
             const string pagesCountRegex = @"<b>Страница 1 от (?<pagesCount>\d{1,2})<\/b>";
@@ -102,11 +110,14 @@
 
             var brandsModelsContainer = GetBrandsModelsContainer();
 
+            int carsPerBrandAndModel = 0;
+
             foreach (var brand in brandsModelsContainer.BrandsModels)
             {
+                
                 foreach (var model in brand.Value)
                 {
-
+                    carsPerBrandAndModel = 0;
                     var formData =
                     $"rub=1&act=3&f5={brand.Key}&f6={model}";
                     var response = await client.PostAsync(
@@ -135,6 +146,8 @@
 
                         foreach (var advertisement in advertisements)
                         {
+                            carsPerBrandAndModel++;
+
                             var url = "https:" + advertisement.Attributes["href"].Value;
                             var advertisementResponse = await client.GetAsync(url);
 
@@ -149,8 +162,9 @@
                                                         .Select(ch => ch == ' ' ? "" : ch.ToString())));
                             }
                             catch (FormatException)
-                            {   
+                            {
                                 //Handle "По договаряне"
+                                skippedBecauseBadPrice++;
                                 continue;
                             }
 
@@ -176,21 +190,21 @@
                                 continue;
                             }
 
-                            File.AppendAllText("data1.csv", $"{brand.Key.Trim()},");
-                            File.AppendAllText("data1.csv", $"{model.Trim()},");
-                            File.AppendAllText("data1.csv", $"{mainProperties["Категория"].Trim()},", Encoding.UTF8);
-                            File.AppendAllText("data1.csv", $"{mainProperties["Дата на производство"].Trim()},", Encoding.UTF8);
+                            stringBuilder.Append($"{brand.Key.Trim()},");
+                            stringBuilder.Append($"{model.Trim()},");
+                            stringBuilder.Append($"{mainProperties["Категория"].Trim()},");
+                            //stringBuilder.Append($"{mainProperties["Дата на производство"].Trim()},");
                             GroupCollection groups = manufacturedTimeRegexObject.Match(mainProperties["Дата на производство"].Trim()).Groups;
                             groups.TryGetValue("month", out Group monthGroup);
                             string month = monthGroup.Value;
                             groups.TryGetValue("year", out Group yearЯGroup);
                             string year = yearЯGroup.Value;
                             var monthsSinceManufacturing = (2020 - int.Parse(year)) * 12 + this.GetnumberFromMonthDependingOnCurrentMonth(month);
-                            File.AppendAllText("data1.csv", $"{monthsSinceManufacturing},", Encoding.UTF8);
-                            File.AppendAllText("data1.csv", $"{mainProperties["Тип двигател"].Trim()},", Encoding.UTF8);
-                            File.AppendAllText("data1.csv", $"{mainProperties["Мощност"].Trim().Substring(0,mainProperties["Мощност"].Trim().Length - 5)},", Encoding.UTF8);
-                            File.AppendAllText("data1.csv", $"{mainProperties["Скоростна кутия"].Trim()},", Encoding.UTF8);
-                            File.AppendAllText("data1.csv", $"{mainProperties["Пробег"].Trim().Substring(0, mainProperties["Пробег"].Trim().Length - 3)},".Trim(), Encoding.UTF8);
+                            stringBuilder.Append($"{monthsSinceManufacturing},");
+                            stringBuilder.Append($"{mainProperties["Тип двигател"].Trim()},");
+                            stringBuilder.Append($"{mainProperties["Мощност"].Trim().Substring(0,mainProperties["Мощност"].Trim().Length - 5)},");
+                            stringBuilder.Append($"{mainProperties["Скоростна кутия"].Trim()},");
+                            stringBuilder.Append($"{mainProperties["Пробег"].Trim().Substring(0, mainProperties["Пробег"].Trim().Length - 3)},".Trim());
 
                             IHtmlCollection<IElement> tables = advertisementPageParsed.GetElementsByTagName("table");
 
@@ -207,7 +221,7 @@
                             {
                                 for (int i = 0; i < aditionalInfoFeatrures.Length; i++)
                                 {
-                                    File.AppendAllText("data1.csv", $"-1,");
+                                    stringBuilder.Append($"-1,");
                                 }
                                 skippedBecauseLackAdditionalInfo++;
                             }
@@ -216,21 +230,25 @@
                                 foreach (var featrue in aditionalInfoFeatrures)
                                 {
                                     string trueOrFalseToInt = tableInfo.InnerHtml.Contains(featrue) ? "1" : "0";
-                                    File.AppendAllText("data1.csv", $"{trueOrFalseToInt},", Encoding.UTF8);
+                                    stringBuilder.Append($"{trueOrFalseToInt},");
                                 }
                             }
 
-                            File.AppendAllText("data1.csv", $"{price},".Trim(), Encoding.UTF8);
-                            File.AppendAllText("data1.csv", @$"""{url}""".Trim(), Encoding.UTF8);
-                            File.AppendAllText("data1.csv", "\n");
+                            stringBuilder.Append($"{price},".Trim());
+                            //stringBuilder.Append(@$"""{url}""".Trim());
+                            stringBuilder.Append("\n");
                         }
                     }
 
                     Console.WriteLine($"Collection information about : {brand.Key} , {model}");
+                    Console.WriteLine($"Cars {brand.Key} , {model} : {carsPerBrandAndModel}");
+                    File.AppendAllText("data1.csv", stringBuilder.ToString(), Encoding.UTF8);
+                    stringBuilder.Clear();
                     if (brand.Key == "Alfa Romeo" && model == "147")
                     {
                         Console.WriteLine(nameof(skippedBecauseLackAdditionalInfo) + " " + skippedBecauseLackAdditionalInfo);
                         Console.WriteLine(nameof(skippedBecauseMainInfo) + " " + skippedBecauseMainInfo);
+                        Console.WriteLine(nameof(skippedBecauseBadPrice) + " " + skippedBecauseBadPrice);
                         return;
                     }
                 }
