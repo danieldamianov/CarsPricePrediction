@@ -11,6 +11,7 @@
     using System.Text.RegularExpressions;
     using AngleSharp.Dom;
     using AngleSharp.Html.Dom;
+    using System.Diagnostics;
 
     public class MobileBgDataCollector
     {
@@ -94,7 +95,7 @@
             {
                 stringBuilder.Append($"{featrue},");
             }
-            stringBuilder.Append("Price,");
+            stringBuilder.Append("Price");
             //stringBuilder.Append(@"""AdvertisementUrl""");
             stringBuilder.Append("\n");
 
@@ -234,7 +235,7 @@
                                 }
                             }
 
-                            stringBuilder.Append($"{price},".Trim());
+                            stringBuilder.Append($"{price}".Trim());
                             //stringBuilder.Append(@$"""{url}""".Trim());
                             stringBuilder.Append("\n");
                         }
@@ -244,18 +245,11 @@
                     Console.WriteLine($"Cars {brand.Key} , {model} : {carsPerBrandAndModel}");
                     File.AppendAllText("data1.csv", stringBuilder.ToString(), Encoding.UTF8);
                     stringBuilder.Clear();
-                    if (brand.Key == "Alfa Romeo" && model == "147")
-                    {
-                        Console.WriteLine(nameof(skippedBecauseLackAdditionalInfo) + " " + skippedBecauseLackAdditionalInfo);
-                        Console.WriteLine(nameof(skippedBecauseMainInfo) + " " + skippedBecauseMainInfo);
-                        Console.WriteLine(nameof(skippedBecauseBadPrice) + " " + skippedBecauseBadPrice);
-                        return;
-                    }
                 }
             }
-
             Console.WriteLine(nameof(skippedBecauseLackAdditionalInfo) + " " + skippedBecauseLackAdditionalInfo);
             Console.WriteLine(nameof(skippedBecauseMainInfo) + " " + skippedBecauseMainInfo);
+            Console.WriteLine(nameof(skippedBecauseBadPrice) + " " + skippedBecauseBadPrice);
         }
 
         private static BrandsModelsContainer GetBrandsModelsContainer()
