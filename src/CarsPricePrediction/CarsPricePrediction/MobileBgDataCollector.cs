@@ -99,7 +99,7 @@
             //stringBuilder.Append(@"""AdvertisementUrl""");
             stringBuilder.Append("\n");
 
-            File.WriteAllText("data1.csv", stringBuilder.ToString(), Encoding.UTF8);
+            File.WriteAllText("newData.csv", stringBuilder.ToString(), Encoding.UTF8);
             stringBuilder.Clear();
 
             const string SearchAddressPost = "https://www.mobile.bg/pcgi/mobile.cgi";
@@ -200,7 +200,7 @@
                             string month = monthGroup.Value;
                             groups.TryGetValue("year", out Group yearЯGroup);
                             string year = yearЯGroup.Value;
-                            var monthsSinceManufacturing = (2020 - int.Parse(year)) * 12 + this.GetnumberFromMonthDependingOnCurrentMonth(month);
+                            var monthsSinceManufacturing = (2021 - int.Parse(year)) * 12 + this.GetnumberFromMonthDependingOnCurrentMonth(month);
                             stringBuilder.Append($"{monthsSinceManufacturing},");
                             stringBuilder.Append($"{mainProperties["Тип двигател"].Trim()},");
                             stringBuilder.Append($"{mainProperties["Мощност"].Trim().Substring(0,mainProperties["Мощност"].Trim().Length - 5)},");
@@ -243,7 +243,7 @@
 
                     Console.WriteLine($"Collection information about : {brand.Key} , {model}");
                     Console.WriteLine($"Cars {brand.Key} , {model} : {carsPerBrandAndModel}");
-                    File.AppendAllText("data1.csv", stringBuilder.ToString(), Encoding.UTF8);
+                    File.AppendAllText("newData.csv", stringBuilder.ToString(), Encoding.UTF8);
                     stringBuilder.Clear();
                 }
             }

@@ -9,7 +9,7 @@ namespace CarsDataClearer
     {
         static void Main(string[] args)
         {
-            string[] carsInfo = File.ReadAllLines("data.csv");
+            string[] carsInfo = File.ReadAllLines("newData.csv");
 
             foreach (var item in carsInfo)
             {
@@ -26,7 +26,7 @@ namespace CarsDataClearer
 
                 if (isValid)
                 {
-                    File.AppendAllText("cleanData.csv", item + Environment.NewLine, Encoding.UTF8);
+                    File.AppendAllText("newCleanData.csv", item + Environment.NewLine, Encoding.UTF8);
                 }
             }
             
