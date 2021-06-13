@@ -103,7 +103,7 @@
             stringBuilder.Clear();
 
             const string SearchAddressPost = "https://www.mobile.bg/pcgi/mobile.cgi";
-            const string pagesCountRegex = @"<b>Страница 1 от (?<pagesCount>\d{1,2})<\/b>";
+            const string pagesCountRegex = @"<b>Страница 1 от (?<pagesCount>\d{1,3})<\/b>";
             const string manufacturedTimeRegex = @"(?<month>[а-я]{2,})\s(?<year>[\d]{4})";
 
             var pagesCountRegexObject = new Regex(pagesCountRegex);
